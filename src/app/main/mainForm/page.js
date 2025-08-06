@@ -41,7 +41,6 @@ useEffect(() => {
 }, [jobDetails.jobDate, jobDetails.clientTime]);
 
 
-
   useEffect(() => {
     const delayDebounce = setTimeout(async () => {
       const id = jobDetails.clientId.trim();
