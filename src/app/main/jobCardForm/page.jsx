@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 
-export default function JobCardForm() {
+export default function jobCardFormPage() {
   const [activeModal, setActiveModal] = useState(null);
   const [completedTasks, setCompletedTasks] = useState({});
   const [taskData, setTaskData] = useState({});
@@ -113,14 +113,44 @@ function parseCustomDate(dateStr) {
   };
 
 const handleFinalSubmit = async () => {
-  const { jobId, clientId, clientName, jobDate } = jobDetails;
+  const { jobId, clientId, jobDate } = jobDetails;
 
-  if (!jobId || !clientId || !clientName || !jobDate) {
+  if (!jobId || !clientId || !jobDate) {
     setSubmitMessage("❌ Please fill in all required fields.");
     return;
   }
 
-  // Job card payload
+  // Fetch client name if not already present
+  let clientName = jobDetails.clientName;
+  if (!clientName) {
+    const { data, error } = await supabase
+      .from("clients")
+      .select("name")
+      .eq("client_id", clientId)
+      .limit(1)
+      .single();
+
+    if (error || !data?.name) {
+      setSubmitMessage("❌ Failed to fetch client name.");
+      return;
+    }
+
+    clientName = data.name;
+  }
+
+  // Check for duplicate job_card
+  const { data: existingCard } = await supabase
+    .from("job_card")
+    .select("job_id")
+    .eq("job_id", jobId)
+    .eq("client_id", clientId)
+    .maybeSingle();
+
+  if (existingCard) {
+    setSubmitMessage("⚠️ A job card for this job already exists.");
+    return;
+  }
+
   const jobCardPayload = {
     job_id: jobId,
     client_id: clientId,
@@ -128,7 +158,6 @@ const handleFinalSubmit = async () => {
     date: jobDate,
   };
 
-  // Jobs table payload
   const jobPayload = {
     job_id: jobId,
     client_id: clientId,
@@ -137,17 +166,17 @@ const handleFinalSubmit = async () => {
     tasks: taskData,
   };
 
-  // Insert into job_card
   const { error: cardError } = await supabase.from("job_card").insert([jobCardPayload]);
 
   if (cardError) {
     console.error("Insert error in job_card:", cardError);
+    console.log("Name:", clientName);
+    console.log("Payload:", jobCardPayload);
     setSubmitMessage("❌ Failed to submit data to job_card.");
     return;
   }
 
-  // Insert into jobs
-  const { error: jobError } = await supabase.from("jobs").insert([jobPayload]);
+  await supabase.from("jobs").insert([jobPayload]);
 
   setSubmitMessage("✅ Job card and job entry submitted successfully!");
 
@@ -187,7 +216,7 @@ const handleFinalSubmit = async () => {
     <div className="min-h-screen max-h-screen overflow-y-auto bg-gray-100 p-4">
       
       <div className="max-w-6xl mx-auto bg-white shadow-xl rounded-2xl p-6 md:p-10">
-<div className="bg-blue-500 text-white py-3 px-6 rounded-t-2xl -mt-6 -ml-6 -mr-6 md:-mt-10 md:-ml-10 md:-mr-10">
+<div className="bg-blue-500 text-white mx-auto py-3 px-4 rounded-t-2xl -mt-6 -ml-6 -mr-6 md:-mt-10 md:-ml-10 md:-mr-10">
   <h1 className="text-xl font-semibold text-center">JOB CARD</h1>
 </div>
 <br></br>
@@ -251,7 +280,6 @@ const handleFinalSubmit = async () => {
                   </div>
                 )}
             </div>
-
 
 
             <div className="mb-10">
